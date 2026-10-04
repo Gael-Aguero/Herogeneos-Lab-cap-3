@@ -1,0 +1,13 @@
+
+ Performance counter stats for './build-prof/drop_simulation':
+
+     117203,698692      task-clock (msec)         #    1,000 CPUs utilized          
+   110 544 607 063      cycles                    #    0,943 GHz                    
+   118 200 924 532      instructions              #    1,07  insn per cycle         
+   <not supported>      branches                                                    
+        32 993 843      branch-misses                                               
+    26 842 791 572      cache-references          #  229,027 M/sec                  
+       230 444 924      cache-misses              #    0,858 % of all cache refs    
+
+     117,221927000 seconds time elapsed
+
