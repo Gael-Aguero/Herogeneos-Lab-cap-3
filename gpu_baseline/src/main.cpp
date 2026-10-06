@@ -156,7 +156,7 @@ int main() {
 
         for (int frame = 0; frame < total_frames; ++frame) {
             for (int step = 0; step < cfg.steps_per_frame; ++step) {
-                simulate_step(previous, current, next, cfg);
+               gpu_step(previous.data(), current.data(), next.data(), cfg.width, cfg.height, cfg.wave_speed, cfg.damping, cfg.edge_damping);//llamada al kernel de step
                 previous.swap(current);
                 current.swap(next);
             }

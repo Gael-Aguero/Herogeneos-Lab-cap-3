@@ -18,7 +18,8 @@ stdcxx_fs = cpp_comp.find_library('stdc++fs', required: false)
 executable(
   'drop_simulation',
 [  'src/main.cpp',
- 'src/frameKernel.cu'],
+ 'src/frameKernel.cu',
+'src/stepKernel.cu'],
  
  dependencies:[ opencv,cuda_dep,stdcxx_fs,],
   install: false,

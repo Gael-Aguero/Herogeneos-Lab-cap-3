@@ -5,7 +5,9 @@
 
 // se usa extern C para decirle al compilador que no es un arhco de C y asi evitar problemas entre C y CUDA
 extern "C" {
-	void gpu_render(const float*height_host, unsigned char* out_gray, int width, int height, float lx, float ly, float lz);
+	void gpu_render(const float*height_host, unsigned char* out_gray, int width, int height, float lx, float ly, float lz); 
+	void gpu_step(const float* h_prev, const float* h_cur, float* next_h,
+                 int width, int height, float wave_speed, float damping, float edge_damping);
 }
 
 
