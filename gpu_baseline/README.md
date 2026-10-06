@@ -1,12 +1,9 @@
 # Drop Simulation
-NOTA: esta version esta modificada para correr en la jetson.
-
-Prototipo CPU en C++ y OpenCV para simular la caida de una gota sobre un estanque
+Prototipo GPU en C++,CUDA y OpenCV para simular la caida de una gota sobre un estanque
 usando una ecuacion de onda 2D amortiguada.
 
-El objetivo es que esta version sea la referencia inicial del laboratorio antes de
-portar el calculo principal a GPU y aplicar optimizaciones como coalescing,
-shared memory, matematica aproximada y precision de 16 bits.
+Esta version inicial del programa en GPU añade  en la carpeta src/ dos archivos fuente extra: frameKernel.cu que es un programa de CUDA que implementa el calculo de los pixeles en paralelo en la GPU, y gpu_render.h que es un archivo de cabecera que permite incluir el wrapper del kernel de calculo de frames (la funcion del host) en el programa main de la simulacion de la gota. Tambien se hicieron cambios en el meson file y el programa main.cpp para que se pueda correr en la jetson. Se comparó esta version con la version de solo CPU y se encontró que este programa dura unos 40s mientras que la versión de CPU dura unos 110s (en la jetson) obteniendo un speedup de unas 2.75 veces. Hay optimizaciones que se pueden seguir realizando cuyas recomendaciones estan en el codigo de CUDA. 
+
 
 ## Compilar
 
@@ -18,7 +15,7 @@ meson compile -C build
 ## Ejecutar
 
 ```bash
-./build/drop_simulation_cpu
+./build/drop_simulation
 ```
 
 Por defecto genera:

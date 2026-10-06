@@ -1,11 +1,21 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+// esto fue necesario para que el codigo compilara en la jetson
+#if __has_include(<filesystem>)
+    #include <filesystem>
+    namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+    #include <experimental/filesystem>
+    namespace fs = std::experimental::filesystem;
+#else
+    #error "No se encontró cabecera para filesystem en este compilador."
+#endif
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -84,7 +94,6 @@ void simulate_step(const std::vector<float>& previous,
         }
     }
 }
-
 cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int frame_number) {
     cv::Mat image(cfg.height, cfg.width, CV_8UC3);
 
@@ -134,9 +143,9 @@ int main() {
         const int total_frames = static_cast<int>(std::round(cfg.seconds * cfg.fps));
         const std::size_t cells = static_cast<std::size_t>(cfg.width) * static_cast<std::size_t>(cfg.height);
 
-        std::filesystem::path output_path(cfg.output);
+        fs::path output_path(cfg.output);
         if (output_path.has_parent_path()) {
-            std::filesystem::create_directories(output_path.parent_path());
+        	fs::create_directories(output_path.parent_path());
         }
 
         std::vector<float> previous(cells, 0.0f);
