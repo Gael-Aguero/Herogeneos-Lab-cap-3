@@ -21,6 +21,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 
+#include "gpu_render.h" // se incluye el header para poder pasar el kernel de cuda
 namespace {
 
 struct Config {
@@ -94,37 +95,24 @@ void simulate_step(const std::vector<float>& previous,
         }
     }
 }
+
 cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int frame_number) {
     cv::Mat image(cfg.height, cfg.width, CV_8UC3);
 
     const cv::Vec3f light_dir = cv::normalize(cv::Vec3f(-0.35f, -0.55f, 0.76f));
-
-    for (int y = 0; y < cfg.height; ++y) {
-        for (int x = 0; x < cfg.width; ++x) {
-            const int xm = std::max(0, x - 1);
-            const int xp = std::min(cfg.width - 1, x + 1);
-            const int ym = std::max(0, y - 1);
-            const int yp = std::min(cfg.height - 1, y + 1);
-
-            const float dx = height[index_of(xm, y, cfg.width)] - height[index_of(xp, y, cfg.width)];
-            const float dy = height[index_of(x, ym, cfg.width)] - height[index_of(x, yp, cfg.width)];
-            const cv::Vec3f normal = cv::normalize(cv::Vec3f(2.8f * dx, 2.8f * dy, 1.0f));
-
-            const float diffuse = std::max(0.0f, normal.dot(light_dir));
-            const float wave = std::clamp(0.5f + 1.8f * height[index_of(x, y, cfg.width)], 0.0f, 1.0f);
-            const float specular = std::pow(std::max(0.0f, diffuse), 24.0f);
-
-            float intensity = 35.0f + 120.0f * wave;
-            intensity *= 0.60f + 0.65f * diffuse;
-            intensity += 130.0f * specular;
-
-            const auto gray = static_cast<unsigned char>(std::clamp(intensity, 0.0f, 255.0f));
-            image.at<cv::Vec3b>(y, x) = cv::Vec3b(gray, gray, gray);
-        }
-    }
+	// llamada a el kernel para renderizar los frames
+    gpu_render(
+        height.data(),               
+        image.data,                 
+        cfg.width,
+        cfg.height,
+        light_dir[0],                
+        light_dir[1],                
+        light_dir[2]                 
+    );
 
     cv::putText(image,
-                "CPU float32 | frame " + std::to_string(frame_number),
+                "GPU float32 | frame " + std::to_string(frame_number),
                 cv::Point(18, 32),
                 cv::FONT_HERSHEY_SIMPLEX,
                 0.65,
@@ -168,7 +156,7 @@ int main() {
 
         for (int frame = 0; frame < total_frames; ++frame) {
             for (int step = 0; step < cfg.steps_per_frame; ++step) {
-                simulate_step(previous, current, next, cfg);
+               gpu_step(previous.data(), current.data(), next.data(), cfg.width, cfg.height, cfg.wave_speed, cfg.damping, cfg.edge_damping);//llamada al kernel de step
                 previous.swap(current);
                 current.swap(next);
             }

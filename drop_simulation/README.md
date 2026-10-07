@@ -1,4 +1,5 @@
 # Drop Simulation
+NOTA: esta version esta modificada para correr en la jetson.
 
 Prototipo CPU en C++ y OpenCV para simular la caida de una gota sobre un estanque
 usando una ecuacion de onda 2D amortiguada.
@@ -17,7 +18,7 @@ meson compile -C build
 ## Ejecutar
 
 ```bash
-./build/drop_simulation
+./build/drop_simulation_cpu
 ```
 
 Por defecto genera:
