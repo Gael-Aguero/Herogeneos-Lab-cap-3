@@ -63,3 +63,28 @@ No obstante, portar únicamente una de las dos funciones limita el beneficio. La
 - **Inicialización de la gota:** Se lleva a cabo una única vez y su coste es mínimo (inferior al 0,4 %).
 - **Ciclo principal y configuración:**  son secuenciales, sin paralelismo que se pueda aprovechar.
 
+### Diseño de los kernels CUDA
+Se portaron a GPU las dos funciones que el perfilado identificó como más costosas: el renderizado de cada cuadro (render_frame) y la actualización de la ecuación de onda (simulate_step, junto con border_absorption). Ambas se implementaron como kernels: frameKernel y stepKernel y se llaman desde funciones wrapper (la funcion main del host) las cuales son declaradas con un extern "C" en un header sin tipos de CUDA, para que main.cpp se compile con el compilador de C++ y solo los archivos .cu pasen por nvcc.
+
+El flujo de datos para esta primer implementación se puede observar en el siguiente diagrama:
+
+![Flujo de datos GPU baseline](./imgs/FlowDiagramGpuBaseline.drawio.png)
+
+Para la paralelización, en ambos kernels se asigna un hilo por pixel (o celda de la malla). Cada hilo calcula sus coordenadas globales y ejecuta el calculo correspondiente. En este caso, la salida de cada hilo solo depende de los datos de entrada y se escriben en una posición exclusiva para cada hilo (es decir cada nilo escribe en una posicion de memoria asignada), por lo que no se requirió sincronizar los hilos. 
+
+Respecto a la configuración de bloques e hilos, se usaron bloques de 16x16 hilos, definidos con la constante BLOCK_SIZE, así mismo, la cuadrícula se calcula con división entera redondeada hacia arriba  que cubrir toda la malla aunque sus dimensiones no sean múltiplos del bloque, los hilos sobrantes se descartan. Es importante hacer notar que el tamaño del bloque no se ajustó todavía, sino que queda como parámetro a explorar en la fase de optmización.
+
+Respecto a los accesos a memoria, para el acceso a memoria se usó el acceso a memoria coalescente tanto para escrituras como para lecturas, sin embargo en esta versión no se usa memoria compartida, sino que los vecinos se leen directamente de memoria global.
+
+También se tuvieron que reescribir algunas funciones que no estaban disponibles en CUDA pero que si existían en GPU, a continuación se hace una tabla de resúmen:
+
+| Versión CPU | Versión CUDA |
+|---|---|
+| `cv::Vec3f`, `cv::normalize`, `.dot()` | Componentes `float` sueltas y `rsqrtf` (se calcula `1/√(x²+y²+z²)` una vez y se multiplica) |
+| `std::max`, `std::min`, `std::clamp` | `max`, `min` (enteros), `fmaxf`, `fminf` y la función `clampf` |
+| `std::pow` | `powf` |
+| `border_absorption` (con `std::min` de lista de inicialización) | Cálculo en línea con `min(min(x, y), min(ancho-1-x, alto-1-y))` |
+| `image.at<cv::Vec3b>` | Escritura en un arreglo de `uchar3`, que ocupa 3 bytes igual que un píxel `CV_8UC3` |
+
+
+
