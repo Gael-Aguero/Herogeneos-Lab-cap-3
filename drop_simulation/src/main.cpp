@@ -22,7 +22,13 @@
 #include <opencv2/videoio.hpp>
 
 namespace {
+/* Agrupa los parametros de tres categorias: 
+Formato de video: width, height, seconds, fps, output
+Física: wave_speed, damping, edge_damping
+Gota: drop_radius, drop_strength
 
+Uso: se crea el objeto Config en main, y luego se pasa como argumento a las funciones add_drop, border_absorption, simulate_step y render_frame.
+*/ 
 struct Config {
     int width = 640;
     int height = 640;
@@ -37,10 +43,12 @@ struct Config {
     std::string output = "output/drop_simulation.mp4";
 };
 
+// Convierte las coordenadas x e y en la posicion correspondiente dentro del vector para ubicar la celda en el vector
 int index_of(int x, int y, int width) {
     return y * width + x;
 }
 
+// Agrega una gota en el centro y genera un pulso para iniciar las ondas de la simulacion.
 void add_drop(std::vector<float>& current, std::vector<float>& previous, const Config& cfg) {
     const float cx = 0.5f * static_cast<float>(cfg.width - 1);
     const float cy = 0.5f * static_cast<float>(cfg.height - 1);
@@ -59,6 +67,7 @@ void add_drop(std::vector<float>& current, std::vector<float>& previous, const C
     }
 }
 
+// Calcula cuanto frenar la onda, según la distancia de los bordes
 float border_absorption(int x, int y, const Config& cfg) {
     constexpr int band = 32;
     const int dist = std::min({x, y, cfg.width - 1 - x, cfg.height - 1 - y});
@@ -70,6 +79,10 @@ float border_absorption(int x, int y, const Config& cfg) {
     return cfg.damping + cfg.edge_damping * t * t;
 }
 
+/* Calcula el siguiente estado de la onda comparando cada celda con sus 4 vecinas
+y ajustando su altura, mediante la ecuación de onda bidimensional amortiguada: next = 2*current - previous + c²*laplaciano - damping*(current - previous)
+donde laplaciano = izq + der + arriba + abajo - 4*centro.
+*/
 void simulate_step(const std::vector<float>& previous,
                    const std::vector<float>& current,
                    std::vector<float>& next,
@@ -77,7 +90,7 @@ void simulate_step(const std::vector<float>& previous,
     const float c2 = cfg.wave_speed * cfg.wave_speed;
 
     std::fill(next.begin(), next.end(), 0.0f);
-
+// for anidados para recorrer todas las celdas de la simulacion, excepto los bordes, y calcular la altura de la onda en cada celda.
     for (int y = 1; y < cfg.height - 1; ++y) {
         for (int x = 1; x < cfg.width - 1; ++x) {
             const int idx = index_of(x, y, cfg.width);
@@ -94,6 +107,8 @@ void simulate_step(const std::vector<float>& previous,
         }
     }
 }
+
+// Crea una imagen en escala de grises a partir de la altura de la onda. 
 cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int frame_number) {
     cv::Mat image(cfg.height, cfg.width, CV_8UC3);
 
@@ -137,6 +152,7 @@ cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int fr
 
 }  // namespace
 
+// Prepara la simulacion, genera sus frames y los guarda en un video, lo hace cfg.seconds * cfg.fps es decir 900 veces.
 int main() {
     try {
         const Config cfg;
