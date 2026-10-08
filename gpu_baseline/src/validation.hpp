@@ -19,12 +19,17 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
-#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+// POSIX en lugar de std::filesystem: el GCC de la Jetson Nano (7.x) no trae un
+// <filesystem> completo y ademas exigiria enlazar con -lstdc++fs.
+#include <cerrno>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 namespace validation {
 
@@ -45,14 +50,26 @@ inline std::string file_name(Kind kind, int frame) {
     return buf;
 }
 
+// Equivalente a `mkdir -p`: crea la carpeta y sus padres si no existen.
+inline void make_dirs(const std::string& path) {
+    for (std::size_t i = 1; i <= path.size(); ++i) {
+        if (i == path.size() || path[i] == '/') {
+            const std::string part = path.substr(0, i);
+            if (::mkdir(part.c_str(), 0777) != 0 && errno != EEXIST) {
+                throw std::runtime_error("No se pudo crear la carpeta: " + part);
+            }
+        }
+    }
+}
+
 namespace detail {
 
-inline std::ofstream open_out(const std::filesystem::path& dir, Kind kind, int width, int height, int frame) {
-    std::filesystem::create_directories(dir);
-    const auto path = dir / file_name(kind, frame);
-    std::ofstream out(path, std::ios::binary);
+inline std::ofstream open_out(const std::string& dir, Kind kind, int width, int height, int frame) {
+    make_dirs(dir);
+    const std::string path = dir + "/" + file_name(kind, frame);
+    std::ofstream out(path.c_str(), std::ios::binary);
     if (!out) {
-        throw std::runtime_error("No se pudo escribir: " + path.string());
+        throw std::runtime_error("No se pudo escribir: " + path);
     }
     const char magic[4] = {'D', 'S', 'V', '1'};
     const std::uint32_t k = static_cast<std::uint32_t>(kind);
@@ -85,10 +102,10 @@ inline void write_frame(const std::string& dir, int frame, const unsigned char* 
     }
 }
 
-inline Dump read_dump(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
+inline Dump read_dump(const std::string& path) {
+    std::ifstream in(path.c_str(), std::ios::binary);
     if (!in) {
-        throw std::runtime_error("No se pudo abrir: " + path.string());
+        throw std::runtime_error("No se pudo abrir: " + path);
     }
     char magic[4];
     std::uint32_t kind = 0;
@@ -98,7 +115,7 @@ inline Dump read_dump(const std::filesystem::path& path) {
     in.read(reinterpret_cast<char*>(dims), sizeof dims);
     if (!in || magic[0] != 'D' || magic[1] != 'S' || magic[2] != 'V' || magic[3] != '1' ||
         (kind != 1 && kind != 2) || dims[0] <= 0 || dims[1] <= 0) {
-        throw std::runtime_error("Formato invalido: " + path.string());
+        throw std::runtime_error("Formato invalido: " + path);
     }
 
     Dump d;
@@ -116,7 +133,7 @@ inline Dump read_dump(const std::filesystem::path& path) {
         in.read(reinterpret_cast<char*>(d.pixels.data()), static_cast<std::streamsize>(n));
     }
     if (!in) {
-        throw std::runtime_error("Archivo truncado: " + path.string());
+        throw std::runtime_error("Archivo truncado: " + path);
     }
     return d;
 }
