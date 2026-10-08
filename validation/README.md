@@ -14,24 +14,11 @@ Se guardan dos cosas por cuadro:
 | Archivo | Contenido | Para qué sirve |
 |---|---|---|
 | `height_fNNNNNN.bin` | Malla de alturas completa, `float32` (640×640) | Error numérico real de la simulación |
-| `frame_fNNNNNN.bin` | Cuadro en escala de grises, `uint8`, **sin el texto superpuesto** | Error visual del renderizado |
+| `frame_fNNNNNN.bin` | Cuadro en escala de grises, `uint8` | Error visual del renderizado |
 
 `NNNNNN` es el índice de cuadro del ciclo principal (por ejemplo `height_f000100.bin`).
 
-## 2. Cambios realizados a los archivos
-
-El `meson.build` **no se modificó**. Los kernels CUDA (`.cu`) y `gpu_render.h` tampoco.
-
-| Archivo | Estado | Qué cambió |
-|---|---|---|
-| `drop_simulation/src/validation.hpp` | **Nuevo** | Header con las funciones para escribir y leer los volcados (`write_heights`, `write_frame`, `read_dump`), `make_dirs` (equivalente a `mkdir -p`) y `parse_frame_list`. |
-| `drop_simulation/src/compare_dumps.cpp` | **Nuevo** | Programa independiente que compara dos carpetas de volcados y calcula las métricas. No usa OpenCV y se compila a mano. |
-| `drop_simulation/src/main.cpp` (CPU) | Modificado | Acepta opciones de línea de comandos, guarda los volcados y ya no usa `std::filesystem` (ver sección 7). |
-| `gpu_baseline/src/main.cpp` (GPU) | Modificado | Mismos cambios de volcado que la CPU. Mantiene su `__has_include` para `filesystem`. |
-| `gpu_baseline/src/validation.hpp` | **Nuevo** | Copia idéntica del header de la CPU. |
-
-
-## 3. Compilación
+## 2. Compilación
 
 ```bash
 # Referencia CPU
@@ -48,7 +35,7 @@ meson setup build
 meson compile -C build
 ```
 
-## 4. Ejecución
+## 3. Ejecución
 
 ```bash
 # 1. Referencia CPU. 
@@ -65,7 +52,7 @@ cd ../gpu_baseline
     --csv validation/gpu_baseline.csv
 ```
 
-### 4.3 Métricas que calcula
+### 3.1 Métricas que calcula
 
 **Alturas:** MAE, RMSE, error absoluto máximo con su posición `(x,y)`, `max|ref|` (pico de la referencia) y error relativo
 al pico. El e### 4.3 Opciones de `compare_dumps`
@@ -90,11 +77,11 @@ un umbral absoluto sería injusto. Cualquier NaN o Inf en la versión de prueba 
 Las columnas que no aplican a un tipo quedan vacías (por ejemplo `ref_scale` en las filas de cuadros).
 
 
-## 5. Resultados: GPU base vs CPU
+## 4. Resultados: GPU base vs CPU
 
 Comparación de `validation/cpu` contra `validation/gpu_baseline`, 7 cuadros. Resultado global: **PASS** en todos.
 
-### 5.1 Malla de alturas (float32)
+### 4.1 Malla de alturas (float32)
 
 | Cuadro | MAE | RMSE | max\|err\| | max\|ref\| | Error relativo al pico | Posición (x,y) |
 |---|---|---|---|---|---|---|
@@ -106,7 +93,7 @@ Comparación de `validation/cpu` contra `validation/gpu_baseline`, 7 cuadros. Re
 | 600 | 2.2e-6 | 3.6e-6 | 1.82e-5 | 1.973 | 9.2e-6 | (265,277) |
 | 899 | 4.5e-6 | 5.7e-6 | 1.88e-5 | 1.198 | 1.6e-5 | (314,312) |
 
-### 5.2 Cuadros (escala de grises)
+### 4.2 Cuadros (escala de grises)
 
 | Cuadro | MAE | Dif. máx. | Píxeles distintos | Píxeles con dif. > 1 | PSNR (dB) |
 |---|---|---|---|---|---|
@@ -120,7 +107,7 @@ Comparación de `validation/cpu` contra `validation/gpu_baseline`, 7 cuadros. Re
 
 Los conteos de píxeles son sobre 409 600 (640×640).
 
-## 6. Análisis
+## 5. Análisis
 
 - **La GPU base es equivalente a la CPU dentro de la tolerancia.** El peor error relativo de las alturas es 1.6e-5
   (cuadro 899), unas 6 veces por debajo del umbral de 1e-4. El mayor error absoluto es 5.9e-5, en el cuadro 100, cuando la
