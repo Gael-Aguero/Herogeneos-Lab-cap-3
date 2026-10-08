@@ -1,0 +1,20 @@
+Sorry, try again.
+==14729== NVPROF is profiling process 14729, command: ./build/drop_simulation
+==14729== Warning: Unified Memory Profiling is not supported on the underlying platform. System requirements for unified memory can be found at: http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#um-requirements
+==14729== Profiling application: ./build/drop_simulation
+==14729== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   38.95%  7.20981s       900  8.0109ms  8.0005ms  8.0184ms  frameKernel(float const *, uchar3*, int, int, float3)
+                   24.80%  4.58931s      2700  1.6997ms  1.5252ms  3.4700ms  [CUDA memcpy HtoD]
+                   23.20%  4.29431s       900  4.7715ms  4.7473ms  4.8998ms  stepKernelShared(float const *, float const *, float*, int, int, float, float, float)
+                   13.05%  2.41475s      1800  1.3415ms  1.1523ms  1.5488ms  [CUDA memcpy DtoH]
+      API calls:   74.57%  23.1577s      4500  5.1462ms  818.93us  15.034ms  cudaMemcpy
+                   19.55%  6.07055s      4500  1.3490ms  886.53us  453.17ms  cudaMalloc
+                    5.10%  1.58315s      4500  351.81us  160.26us  3.4817ms  cudaFree
+                    0.79%  244.00ms      1800  135.56us  97.659us  1.6785ms  cudaLaunchKernel
+                    0.00%  226.93us        97  2.3390us     781ns  90.627us  cuDeviceGetAttribute
+                    0.00%  10.313us         1  10.313us  10.313us  10.313us  cuDeviceTotalMem
+                    0.00%  9.3750us         3  3.1250us  2.1870us  4.6360us  cuDeviceGetCount
+                    0.00%  5.1040us         2  2.5520us  1.1980us  3.9060us  cuDeviceGet
+                    0.00%  2.2920us         1  2.2920us  2.2920us  2.2920us  cuDeviceGetName
+                    0.00%     990ns         1     990ns     990ns     990ns  cuDeviceGetUuid
