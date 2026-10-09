@@ -1,7 +1,7 @@
 # Laboratorio Capítulo 3 
 
 
-## Descripción del programa base
+## 1. Descripción del programa base
 
 Básicamente, el programa simula cómo se comportan las ondas producidas cuando cae una gota sobre la superficie del agua. Primero crea una malla que representa dicha superficie y reserva 3 arreglos de memoria para guardar los estados anterior, actual y siguiente. Luego genera una pequeña perturbación en el centro, que representa la gota.
 
@@ -9,13 +9,13 @@ A partir de ahí repite un ciclo 900 veces. En cada paso calcula el nuevo estado
 
 Al terminar, calcula el tiempo total y el rendimiento en pasos por segundo.
 
-## Diagrama de flujo
+## 2. Diagrama de flujo
 
 <p align="center">
   <img src="./imgs/diagrama_flujo.png" alt="Diagrama de flujo del programa base" width="500">
 </p>
 
-## Explicación de cada función
+## 3. Explicación de cada función
 
 **`Config`:** agrupa los parámetros de tres categorías: formato de video (`width`, `height`, `seconds`, `fps`, `output`), física (`wave_speed`, `damping`, `edge_damping`) y gota (`drop_radius`, `drop_strength`). Se crea en `main` y se pasa como argumento a las funciones `add_drop`, `border_absorption`, `simulate_step` y `render_frame`.
 
@@ -38,9 +38,11 @@ Usa dos `for` anidados para recorrer todas las celdas de la simulación, excepto
 
 **`main`:** prepara la simulación, genera sus cuadros y los guarda en un video. El ciclo se repite `cfg.seconds * cfg.fps` veces, es decir 900. Al final imprime el tiempo, los pasos simulados y el rendimiento en pasos por segundo.
 
-## Resultados del perfilado CPU 
+## 4. Perfilado de la versión CPU 
 
-### Resultados de perf record
+### 4.1 Perfilado con perf 
+
+#### Resultados de perf record
 
 | Grupo | Funciones incluidas | % del tiempo |
 |---|---|---:|
@@ -52,7 +54,7 @@ Usa dos `for` anidados para recorrer todas las celdas de la simulación, excepto
 | Otros | inicialización, `memcpy`, kernel | ≈ 3 % |
 
 
-### Funciones más críticas
+#### Funciones más críticas
 
 El perfilado indica que el programa dedica la mayor parte de su tiempo a renderizar cada cuadro. Aproximadamente el 55,6 % del tiempo de ejecución se utiliza en la función `render_frame`, así como las operaciones que esta llama para determinar la normal de la superficie en cada píxel. Las operaciones vectoriales, `std::max`, `std::clamp`, `cv::norm` y `cv::normalize` son ejemplos de estas últimas. La función `powf`, perteneciente a la biblioteca matemática, representa un 15,2 % más.
 
@@ -60,11 +62,13 @@ La segunda función esencial es la actualización de la malla, `simulate_step`, 
 
 La codificación del video con OpenCV y FFmpeg (`libavcodec` y `libswscale`) representa apenas un 6,7 % del tiempo.
 
-### Porcentajes en el build optimizado
+#### Porcentajes en el build optimizado
 
 Los porcentajes mencionados previamente se derivan de un build compilado con `-fno-inline`, el cual facilita asignar tiempo a cada función, pero sobreestima el costo de funciones pequeñas auxiliares como `std::clamp` o `std::max`, dado que cada invocación tiene un costo. En el build optimizado sin esta bandera, el compilador incorpora la totalidad del cálculo en `main` (56,4 %), mientras que `powf` llega al 27 % del tiempo. Esto valida que calcular la potencia en punto flotante es una de las operaciones más costosas del programa.
 
-### Resultados deGoogle Performance Tools 
+### 4.2 Perfilado con Google Performance Tools 
+
+#### Resultados deGoogle Performance Tools 
 
 La segunda herramienta empleada fue Google Performance Tools (gperftools), la cual se conectó con `libprofiler` y se ejecutó utilizando la variable `CPUPROFILE`. Para la simulación completa (900 pasos) y para perf, se utilizó la misma configuración de compilación (`-O2 -g -fno-omit-frame-pointer -fno-inline`). El perfil se examinó utilizando `google-pprof --text`.
 
@@ -75,7 +79,7 @@ La segunda herramienta empleada fue Google Performance Tools (gperftools), la cu
 | `border_absorption` (llamada por `simulate_step`) | 3,5 % | 12,2 % |
 | `powf` (con sus rutinas internas `exp2`, `log2`, `vrndn_f64`) | — | 15,5 % |
 
-### Comparación entre herramientas
+### 4.3 Comparación entre herramientas
 
 | Grupo | perf | gperftools |
 |---|---:|---:|
@@ -87,20 +91,41 @@ La segunda herramienta empleada fue Google Performance Tools (gperftools), la cu
 
 Tanto el stencil de la ecuación de onda como la codificación del video tienen un peso menor que las otras herramientas, y estas dos últimas coinciden en que el renderizado es la parte más cara del programa, con `powf` y la absorción de bordes.
 
-### Función a portar primero a GPU
+### 4.4 Función a portar primero a GPU
 
 `render_frame` es la función que resulta más conveniente portar primero, ya que requiere mucho tiempo y su operación es independiente por píxel, cada uno de los píxeles de salida depende únicamente de su celda y de sus vecinos más cercanos, lo cual la convierte en perfecta para asignar un hilo de CUDA por cada píxel.
 
 No obstante, portar únicamente una de las dos funciones limita el beneficio. La Ley de Amdahl establece que, si solo se lleva `simulate_step` (cerca del 19 %), el speedup máximo quedaría en 1/(1 − 0,19) ≈ 1,24x. En cambio, si se portan la actualización de la malla y el render simultáneamente, esto abarcaría aproximadamente el 90 % del tiempo y tendría un speedup teórico máximo próximo a 10x. Asimismo, si únicamente una de las dos funciones se llevara a cabo en la GPU, habría que duplicar la malla entre el sistema host y el dispositivo en cada etapa. Por eso se aconseja portar las dos, empezando por el render, y mantener la malla residente en la memoria de la GPU.
 
 
-### Funciones que no conviene portar
+### 4.5 Funciones que no conviene portar
 
 - **Escritura del video:** Utiliza solamente el 6,7 % del tiempo. Depende de las bibliotecas de FFmpeg y OpenCV que funcionan en la CPU, y el cuadro final tiene que estar en la memoria del host para ser entregado al `VideoWriter`.
 - **Inicialización de la gota:** Se lleva a cabo una única vez y su coste es mínimo (inferior al 0,4 %).
 - **Ciclo principal y configuración:**  son secuenciales, sin paralelismo que se pueda aprovechar.
 
-## Diseño de los kernels CUDA
+## 4 Porteo a GPU
+
+### 4.1 Justificación de las funciones portadas 
+
+El perfilado de la versión CPU con perf y Google Performance Tools reveló que dos funciones acaparaban el tiempo de ejecución en su mayor parte:
+
+| Función | Tiempo acumulado (gperftools) | Tiempo (perf) |
+|---|---:|---:|
+| `render_frame` (incluye las operaciones que invoca) | 56.3 % | ≈ 55.6 % |
+| `simulate_step` (incluye `border_absorption`) | 19.0 % | ≈ 19.4 % |
+| `powf` | 15.5 % | 15.2 % |
+
+Tomando en cuenta las llamadas a `powf`, ambas funciones juntas representan aproximadamente el 90 % del tiempo de la versión de CPU. La Ley de Amdahl establece que si solo se porta `simulate_step`, el speedup máximo se limitaría a aproximadamente 1.24x (1 / (1 - 0.19)); en cambio, si ambas funciones son portadas, se puede alcanzar un speedup teórico cercano a 10x.
+
+Asimismo, el libro del curso las clasifica como un problema *data parallel* (pág. 130), lo que quiere decir que son más aptas para la GPU:
+
+- **`simulate_step`** calcula cada celda de la malla basándose en su valor anterior y en el de sus cuatro vecinos del paso anterior. El cálculo de una celda no está condicionado por el de las otras celdas del mismo paso, por ende, todas ellas tienen la capacidad de ser calculadas simultáneamente.
+- **`render_frame`** determina el color de cada píxel, tomando como base la altura de su celda y la de sus celdas vecinas. Cada pixel es autónomo respecto a los demás.
+
+El tamaño del problema también es apropiado, ya que la malla de 640 x 640 produce 409 600 hilos por kernel, lo cual es suficiente para mantener la GPU ocupada.
+
+### 4.2 Diseño de los kernels CUDA
 Se portaron a GPU las dos funciones que el perfilado identificó como más costosas: el renderizado de cada cuadro (render_frame) y la actualización de la ecuación de onda (simulate_step, junto con border_absorption). Ambas se implementaron como kernels: frameKernel y stepKernel y se llaman desde funciones wrapper (la funcion main del host) las cuales son declaradas con un extern "C" en un header sin tipos de CUDA, para que main.cpp se compile con el compilador de C++ y solo los archivos .cu pasen por nvcc.
 
 El flujo de datos para esta primer implementación se puede observar en el siguiente diagrama:
@@ -122,6 +147,28 @@ También se tuvieron que reescribir algunas funciones que no estaban disponibles
 | `std::pow` | `powf` |
 | `border_absorption` (con `std::min` de lista de inicialización) | Cálculo en línea con `min(min(x, y), min(ancho-1-x, alto-1-y))` |
 | `image.at<cv::Vec3b>` | Escritura en un arreglo de `uchar3`, que ocupa 3 bytes igual que un píxel `CV_8UC3` |
+
+### 4.3 Resultados de la GPU base
+
+| Métrica | CPU base | GPU base |
+|---|---:|---:|
+| Tiempo total (promedio de 3 corridas) | 110.00 s | 47.52 s |
+| Pasos por segundo | 8.18 | 18.94 |
+| Speedup respecto a CPU | 1.00x | 2.31x |
+
+La manera en que se distribuye el tiempo es ilustrada por el perfil de la GPU base con `nvprof`:
+
+| Operación | Llamadas | Tiempo |
+|---|---:|---:|
+| `frameKernel` | 900 | 7.210 s |
+| `stepKernel` | 900 | 3.212 s |
+| Copias host-device | 2700 | 4.589 s |
+| Copias device-host | 1800 | 2.415 s |
+| `cudaMemcpy` (API) | 4500 | 22.17 s |
+| `cudaMalloc` (API) | 4500 | 6.12 s |
+| `cudaFree` (API) | 4500 | 1.44 s |
+
+En comparación con la CPU, la GPU base consigue un speedup de 2.31x, lo cual es un resultado poco significativo teniendo en cuenta el grado de paralelismo del problema. La razón es explicada por el perfil: ambos kernels suman 10.42 segundos, mientras que la CPU tarda aproximadamente 30 segundos esperando las llamadas de gestión de memoria y copias. En otras palabras, la mayor parte del tiempo se ocupa de mover datos entre la GPU y la CPU y de reservar memoria en cada paso, no de hacer cálculos.
 
 ## Estrategia de validación CPU vs GPU
 
