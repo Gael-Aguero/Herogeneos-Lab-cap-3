@@ -19,9 +19,7 @@ stdcxx_fs = cpp_comp.find_library('stdc++fs', required: false)
 cuda_comp = meson.get_compiler('cuda')
 
 # Verificar que --use_fast_math es soportado por esta versión de nvcc
-cuda_args = cuda_comp.get_supported_arguments(
-  ['--use_fast_math'],
-)
+cuda_args = ['--use_fast_math']
 
 executable(
   'drop_simulation',
