@@ -1,25 +1,17 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-// esto fue necesario para que el codigo compilara en la jetson
-#if __has_include(<filesystem>)
-    #include <filesystem>
-    namespace fs = std::filesystem;
-#elif __has_include(<experimental/filesystem>)
-    #include <experimental/filesystem>
-    namespace fs = std::experimental::filesystem;
-#else
-    #error "No se encontró cabecera para filesystem en este compilador."
-#endif
-
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
+
+#include "validation.hpp"
 
 namespace {
 /* Agrupa los parametros de tres categorias: 
@@ -41,7 +33,40 @@ struct Config {
     float drop_radius = 18.0f;
     float drop_strength = 1.0f;
     std::string output = "output/drop_simulation.mp4";
+
+    // --- Validacion (Ejercicio E). Si dump_dir esta vacio no se guarda nada. ---
+    std::string dump_dir;
+    std::vector<int> dump_frames = {0, 1, 10, 100, 300, 600, 899};
 };
+
+// Lee opciones opcionales de linea de comandos. Sin argumentos el programa se
+// comporta exactamente igual que antes.
+//   --seconds S          duracion de la simulacion (para pruebas rapidas)
+//   --output ruta.mp4    video de salida
+//   --dump-dir DIR       guarda malla de alturas y cuadro gris en DIR (ver validation.hpp)
+//   --dump-frames a,b,c  indices de cuadro a guardar
+void parse_args(int argc, char** argv, Config& cfg) {
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        auto value = [&]() -> std::string {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Falta el valor de " + arg);
+            }
+            return argv[++i];
+        };
+        if (arg == "--seconds") {
+            cfg.seconds = std::stod(value());
+        } else if (arg == "--output") {
+            cfg.output = value();
+        } else if (arg == "--dump-dir") {
+            cfg.dump_dir = value();
+        } else if (arg == "--dump-frames") {
+            cfg.dump_frames = validation::parse_frame_list(value());
+        } else {
+            throw std::runtime_error("Argumento desconocido: " + arg);
+        }
+    }
+}
 
 // Convierte las coordenadas x e y en la posicion correspondiente dentro del vector para ubicar la celda en el vector
 int index_of(int x, int y, int width) {
@@ -109,7 +134,10 @@ void simulate_step(const std::vector<float>& previous,
 }
 
 // Crea una imagen en escala de grises a partir de la altura de la onda. 
-cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int frame_number) {
+// Si `gray_out` no es nulo, recibe una copia del cuadro en escala de grises (CV_8UC1)
+// tomada ANTES de dibujar el texto, para poder compararla contra la version GPU.
+cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int frame_number,
+                     cv::Mat* gray_out = nullptr) {
     cv::Mat image(cfg.height, cfg.width, CV_8UC3);
 
     const cv::Vec3f light_dir = cv::normalize(cv::Vec3f(-0.35f, -0.55f, 0.76f));
@@ -138,6 +166,10 @@ cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int fr
         }
     }
 
+    if (gray_out != nullptr) {
+        cv::extractChannel(image, *gray_out, 0);
+    }
+
     cv::putText(image,
                 "CPU float32 | frame " + std::to_string(frame_number),
                 cv::Point(18, 32),
@@ -153,15 +185,16 @@ cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int fr
 }  // namespace
 
 // Prepara la simulacion, genera sus frames y los guarda en un video, lo hace cfg.seconds * cfg.fps es decir 900 veces.
-int main() {
+int main(int argc, char** argv) {
     try {
-        const Config cfg;
+        Config cfg;
+        parse_args(argc, argv, cfg);
         const int total_frames = static_cast<int>(std::round(cfg.seconds * cfg.fps));
         const std::size_t cells = static_cast<std::size_t>(cfg.width) * static_cast<std::size_t>(cfg.height);
 
-        fs::path output_path(cfg.output);
+        std::filesystem::path output_path(cfg.output);
         if (output_path.has_parent_path()) {
-        	fs::create_directories(output_path.parent_path());
+            std::filesystem::create_directories(output_path.parent_path());
         }
 
         std::vector<float> previous(cells, 0.0f);
@@ -189,7 +222,15 @@ int main() {
                 current.swap(next);
             }
 
-            writer.write(render_frame(current, cfg, frame));
+            const bool dump_this = !cfg.dump_dir.empty() &&
+                                   std::binary_search(cfg.dump_frames.begin(), cfg.dump_frames.end(), frame);
+            cv::Mat gray;
+            writer.write(render_frame(current, cfg, frame, dump_this ? &gray : nullptr));
+
+            if (dump_this) {
+                validation::write_heights(cfg.dump_dir, frame, current.data(), cfg.width, cfg.height);
+                validation::write_frame(cfg.dump_dir, frame, gray.data, cfg.width, cfg.height);
+            }
 
             if (frame % std::max(1, total_frames / 10) == 0) {
                 std::cout << "Frame " << frame << " / " << total_frames << '\n';

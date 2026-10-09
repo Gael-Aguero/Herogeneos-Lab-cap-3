@@ -22,6 +22,7 @@
 #include <opencv2/videoio.hpp>
 
 #include "gpu_render.h" // se incluye el header para poder pasar el kernel de cuda
+#include "validation.hpp" // Ejercicio E: volcado de alturas/cuadros para comparar contra la CPU
 namespace {
 
 struct Config {
@@ -36,7 +37,36 @@ struct Config {
     float drop_radius = 18.0f;
     float drop_strength = 1.0f;
     std::string output = "output/drop_simulation.mp4";
+
+    // --- Validacion (Ejercicio E). Si dump_dir esta vacio no se guarda nada. ---
+    std::string dump_dir;
+    std::vector<int> dump_frames = {0, 1, 10, 100, 300, 600, 899};
 };
+
+// Opciones opcionales de linea de comandos (igual que en la version CPU).
+//   --seconds S | --output ruta.mp4 | --dump-dir DIR | --dump-frames a,b,c
+void parse_args(int argc, char** argv, Config& cfg) {
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        auto value = [&]() -> std::string {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Falta el valor de " + arg);
+            }
+            return argv[++i];
+        };
+        if (arg == "--seconds") {
+            cfg.seconds = std::stod(value());
+        } else if (arg == "--output") {
+            cfg.output = value();
+        } else if (arg == "--dump-dir") {
+            cfg.dump_dir = value();
+        } else if (arg == "--dump-frames") {
+            cfg.dump_frames = validation::parse_frame_list(value());
+        } else {
+            throw std::runtime_error("Argumento desconocido: " + arg);
+        }
+    }
+}
 
 int index_of(int x, int y, int width) {
     return y * width + x;
@@ -60,56 +90,27 @@ void add_drop(std::vector<float>& current, std::vector<float>& previous, const C
     }
 }
 
-float border_absorption(int x, int y, const Config& cfg) {
-    constexpr int band = 32;
-    const int dist = std::min({x, y, cfg.width - 1 - x, cfg.height - 1 - y});
-    if (dist >= band) {
-        return cfg.damping;
-    }
-
-    const float t = 1.0f - static_cast<float>(dist) / static_cast<float>(band);
-    return cfg.damping + cfg.edge_damping * t * t;
-}
-
-void simulate_step(const std::vector<float>& previous,
-                   const std::vector<float>& current,
-                   std::vector<float>& next,
-                   const Config& cfg) {
-    const float c2 = cfg.wave_speed * cfg.wave_speed;
-
-    std::fill(next.begin(), next.end(), 0.0f);
-
-    for (int y = 1; y < cfg.height - 1; ++y) {
-        for (int x = 1; x < cfg.width - 1; ++x) {
-            const int idx = index_of(x, y, cfg.width);
-            const float laplacian =
-                current[idx - 1] + current[idx + 1] +
-                current[idx - cfg.width] + current[idx + cfg.width] -
-                4.0f * current[idx];
-            const float velocity = current[idx] - previous[idx];
-            const float local_damping = border_absorption(x, y, cfg);
-
-            next[idx] = 2.0f * current[idx] - previous[idx] +
-                        c2 * laplacian -
-                        local_damping * velocity;
-        }
-    }
-}
-
-cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int frame_number) {
+// Si `gray_out` no es nulo, recibe una copia del cuadro en escala de grises (CV_8UC1)
+// tomada ANTES de dibujar el texto, para compararla contra la version CPU.
+cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int frame_number,
+                     cv::Mat* gray_out = nullptr) {
     cv::Mat image(cfg.height, cfg.width, CV_8UC3);
 
     const cv::Vec3f light_dir = cv::normalize(cv::Vec3f(-0.35f, -0.55f, 0.76f));
 	// llamada a el kernel para renderizar los frames
     gpu_render(
-        height.data(),               
-        image.data,                 
+        height.data(),
+        image.data,
         cfg.width,
         cfg.height,
-        light_dir[0],                
-        light_dir[1],                
-        light_dir[2]                 
+        light_dir[0],
+        light_dir[1],
+        light_dir[2]
     );
+
+    if (gray_out != nullptr) {
+        cv::extractChannel(image, *gray_out, 0);
+    }
 
     cv::putText(image,
                 "GPU float32 | frame " + std::to_string(frame_number),
@@ -125,9 +126,10 @@ cv::Mat render_frame(const std::vector<float>& height, const Config& cfg, int fr
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
     try {
-        const Config cfg;
+        Config cfg;
+        parse_args(argc, argv, cfg);
         const int total_frames = static_cast<int>(std::round(cfg.seconds * cfg.fps));
         const std::size_t cells = static_cast<std::size_t>(cfg.width) * static_cast<std::size_t>(cfg.height);
 
@@ -161,7 +163,15 @@ int main() {
                 current.swap(next);
             }
 
-            writer.write(render_frame(current, cfg, frame));
+            const bool dump_this = !cfg.dump_dir.empty() &&
+                                   std::binary_search(cfg.dump_frames.begin(), cfg.dump_frames.end(), frame);
+            cv::Mat gray;
+            writer.write(render_frame(current, cfg, frame, dump_this ? &gray : nullptr));
+
+            if (dump_this) {
+                validation::write_heights(cfg.dump_dir, frame, current.data(), cfg.width, cfg.height);
+                validation::write_frame(cfg.dump_dir, frame, gray.data, cfg.width, cfg.height);
+            }
 
             if (frame % std::max(1, total_frames / 10) == 0) {
                 std::cout << "Frame " << frame << " / " << total_frames << '\n';
