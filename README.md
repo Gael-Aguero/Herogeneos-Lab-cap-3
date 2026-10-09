@@ -1,6 +1,43 @@
 # Laboratorio Capítulo 3 
 
 
+## Descripción del programa base
+
+Básicamente, el programa simula cómo se comportan las ondas producidas cuando cae una gota sobre la superficie del agua. Primero crea una malla que representa dicha superficie y reserva 3 arreglos de memoria para guardar los estados anterior, actual y siguiente. Luego genera una pequeña perturbación en el centro, que representa la gota.
+
+A partir de ahí repite un ciclo 900 veces. En cada paso calcula el nuevo estado de la superficie a partir de los dos anteriores, lo que permite ver cómo se propagan las ondas con el paso del tiempo y cómo van perdiendo energía poco a poco. También aplica una especie de barrera en los bordes de la malla para reducir los rebotes de las ondas y evitar que interfieran con la simulación. Finalmente, convierte cada estado en una imagen y la agrega al video.
+
+Al terminar, calcula el tiempo total y el rendimiento en pasos por segundo.
+
+## Diagrama de flujo
+
+<p align="center">
+  <img src="./imgs/diagrama_flujo.png" alt="Diagrama de flujo del programa base" width="500">
+</p>
+
+## Explicación de cada función
+
+**`Config`:** agrupa los parámetros de tres categorías: formato de video (`width`, `height`, `seconds`, `fps`, `output`), física (`wave_speed`, `damping`, `edge_damping`) y gota (`drop_radius`, `drop_strength`). Se crea en `main` y se pasa como argumento a las funciones `add_drop`, `border_absorption`, `simulate_step` y `render_frame`.
+
+**`index_of`:** convierte las coordenadas x e y en la posición correspondiente dentro del vector, para ubicar la celda.
+
+**`add_drop`:** agrega una gota en el centro y genera un pulso para iniciar las ondas de la simulación.
+
+**`border_absorption`:** calcula cuánto frenar la onda según la distancia a los bordes. Cerca del borde frena más, para que las ondas no reboten.
+
+**`simulate_step`:** calcula el siguiente estado de la onda comparando cada celda con sus 4 vecinas y ajustando su altura, mediante la ecuación de onda bidimensional amortiguada:
+
+```text
+next = 2*current - previous + c²*laplaciano - damping*(current - previous)
+laplaciano = izq + der + arriba + abajo - 4*centro
+```
+
+Usa dos `for` anidados para recorrer todas las celdas de la simulación, excepto los bordes. Calcula un solo paso de tiempo; `main` la llama en cada cuadro.
+
+**`render_frame`:** crea una imagen en escala de grises a partir de la altura de la onda. En lugar de pintar la altura directamente, usa la inclinación de la superficie y una luz fija para que parezca agua.
+
+**`main`:** prepara la simulación, genera sus cuadros y los guarda en un video. El ciclo se repite `cfg.seconds * cfg.fps` veces, es decir 900. Al final imprime el tiempo, los pasos simulados y el rendimiento en pasos por segundo.
+
 ## Resultados del perfilado CPU 
 
 ### Resultados de perf record
