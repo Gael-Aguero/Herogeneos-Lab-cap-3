@@ -104,9 +104,9 @@ No obstante, portar únicamente una de las dos funciones limita el beneficio. La
 - **Inicialización de la gota:** Se lleva a cabo una única vez y su coste es mínimo (inferior al 0,4 %).
 - **Ciclo principal y configuración:**  son secuenciales, sin paralelismo que se pueda aprovechar.
 
-## 4 Porteo a GPU
+## 5 Porteo a GPU
 
-### 4.1 Justificación de las funciones portadas 
+### 5.1 Justificación de las funciones portadas 
 
 El perfilado de la versión CPU con perf y Google Performance Tools reveló que dos funciones acaparaban el tiempo de ejecución en su mayor parte:
 
@@ -125,7 +125,7 @@ Asimismo, el libro del curso las clasifica como un problema *data parallel* (pá
 
 El tamaño del problema también es apropiado, ya que la malla de 640 x 640 produce 409 600 hilos por kernel, lo cual es suficiente para mantener la GPU ocupada.
 
-### 4.2 Diseño de los kernels CUDA
+### 5.2 Diseño de los kernels CUDA
 Se portaron a GPU las dos funciones que el perfilado identificó como más costosas: el renderizado de cada cuadro (render_frame) y la actualización de la ecuación de onda (simulate_step, junto con border_absorption). Ambas se implementaron como kernels: frameKernel y stepKernel y se llaman desde funciones wrapper (la funcion main del host) las cuales son declaradas con un extern "C" en un header sin tipos de CUDA, para que main.cpp se compile con el compilador de C++ y solo los archivos .cu pasen por nvcc.
 
 El flujo de datos para esta primer implementación se puede observar en el siguiente diagrama:
@@ -148,7 +148,7 @@ También se tuvieron que reescribir algunas funciones que no estaban disponibles
 | `border_absorption` (con `std::min` de lista de inicialización) | Cálculo en línea con `min(min(x, y), min(ancho-1-x, alto-1-y))` |
 | `image.at<cv::Vec3b>` | Escritura en un arreglo de `uchar3`, que ocupa 3 bytes igual que un píxel `CV_8UC3` |
 
-### 4.3 Resultados de la GPU base
+### 5.3 Resultados de la GPU base
 
 | Métrica | CPU base | GPU base |
 |---|---:|---:|
@@ -170,14 +170,16 @@ La manera en que se distribuye el tiempo es ilustrada por el perfil de la GPU ba
 
 En comparación con la CPU, la GPU base consigue un speedup de 2.31x, lo cual es un resultado poco significativo teniendo en cuenta el grado de paralelismo del problema. La razón es explicada por el perfil: ambos kernels suman 10.42 segundos, mientras que la CPU tarda aproximadamente 30 segundos esperando las llamadas de gestión de memoria y copias. En otras palabras, la mayor parte del tiempo se ocupa de mover datos entre la GPU y la CPU y de reservar memoria en cada paso, no de hacer cálculos.
 
-## Estrategia de validación CPU vs GPU
+## 6. Estrategia de validación CPU vs GPU
 
-Falta
+### 6.1 Estrategia de validación
+
+### 6.2 Resultados de la GPU base
 
 
-## Optimizaciones
+## 7. Optimizaciones
 
-### Optimización 1: Memoria compartida con tiling y halo 
+### 7.1 Optimización 1: Memoria compartida con tiling y halo 
 
 #### Problema que intenta resolver
 
@@ -239,7 +241,7 @@ Se llevó a cabo un experimento adicional en el que se utilizaron bloques de 32 
 
 Al comparar con la línea base GPU a través de `compare_dumps`, los resultados son exactamente iguales en cada bit: error 0 tanto en las alturas como en los cuadros, en los siete cuadros analizados. Esto es porque el kernel ejecuta las mismas operaciones en el mismo orden, pero la única variación es la procedencia de los datos. Por ende, en la precisión numérica no se ve afectada la optimización, y su error con respecto a la CPU es igual al de la línea base (según la validación del Ejercicio E, el máximo error absoluto es de 5.91e-5 y el máximo error relativo es de 1.6e-5).
 
-### Optimización 2: reducción de comunicación host-device 
+### 7.2 Optimización 2: reducción de comunicación host-device 
 
 #### Problema que intenta resolver
 
@@ -320,7 +322,7 @@ La disminución del tiempo total (16.11 s) es igual al ahorro total en la API (1
 
 Los resultados son exactamente iguales a los de la línea base de GPU, tal como se ha verificado con `compare_dumps`: error 0 en las alturas y en los cuadros, para cada uno de los siete cuadros examinados. Esto se explica porque los kernels efectúan exactamente las mismas operaciones, solo varía el sitio donde se almacenan los datos entre pasos. La residencia de los datos no altera ningún cálculo, por lo que no existe una compensación entre rapidez y precisión, en contraste con las optimizaciones de matemática aproximada o de precisión reducida que se explican en el libro (páginas 158-166). Conforme a la validación del ejercicio E, el error relacionado con la CPU es el mismo que el de la línea base: un error absoluto máximo de 5.91e-5 y un error relativo máximo de 1.6e-5.
 
-### Optimización 3
+### 7.3 Optimización 3
 
 #### Problema que intenta resolver
 
@@ -330,11 +332,11 @@ Los resultados son exactamente iguales a los de la línea base de GPU, tal como 
 
 #### Resultados
 
-## Validación e impacto en la precisión numérica 
+#### Validación e impacto en la precisión numérica 
 
-## Resumen de resultados
+## 8. Resumen de resultados
 
-### Tabla comparativa
+### 8.1 Tabla comparativa
 
 | Versión | Tiempo total | Pasos/s | Speedup | Error máximo |
 |---|---:|---:|---:|---:|
@@ -358,7 +360,7 @@ Detalle de tiempos por versión, obtenido con `nvprof`:
 
 El número de copias se señala entre paréntesis. El speedup de la optimización 2 se determina en relación con la GPU base.
 
-### Salidas relevantes de nvprof
+### 8.2 Salidas relevantes de nvprof
 
 #### GPU base
 
@@ -408,7 +410,7 @@ Kernel: stepKernelShared
     stall_sync                   14.87%
 ```
 
-#### Optimización 2: reducción host-device
+#### Optimización 2: reducción de comunicación host-device
 
 Comunicación después de la optimización (`nvprof_host_device.txt`):
 
@@ -425,3 +427,18 @@ Comunicación después de la optimización (`nvprof_host_device.txt`):
 
 
 Los archivos completos se encuentran dentro de la carpeta `results/` en cada una de las optimizaciones realizadas.
+
+#### Optimización 3:
+
+## 9. Análisis de rendimiento 
+
+## 10. Conclusiones 
+
+## 11. Nota sobre utilización de herramientas de IA
+
+Se hace uso de herramientas de IA como apoyo para comprender conceptos, generar ideas y mejorar la redacción de la documentación. La implementación, la validación y los resultados son responsabilidad del estudiante, quien asume la responsabilidad por el uso indebido o no descrito anteriormente.
+
+Se adjuntan los enlaces compartidos de las conversaciones como evidencia:
+
+- https://share.gemini.google/MZ4nmLKV4dKc
+- https://chatgpt.com/share/6ac84f6e-a9f0-83e8-a1cf-d3643a9d31d0
