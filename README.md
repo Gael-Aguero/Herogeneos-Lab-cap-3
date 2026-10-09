@@ -130,7 +130,9 @@ Se portaron a GPU las dos funciones que el perfilado identificó como más costo
 
 El flujo de datos para esta primer implementación se puede observar en el siguiente diagrama:
 
-![Flujo de datos GPU baseline](./imgs/FlowDiagramGpuBaseline.drawio.png)
+<p align="center">
+  <img src="./imgs/FlowDiagramGpuBaseline.drawio.png" alt="Flujo de datos GPU baseline">
+</p>
 
 Para la paralelización, en ambos kernels se asigna un hilo por pixel (o celda de la malla). Cada hilo calcula sus coordenadas globales y ejecuta el calculo correspondiente. En este caso, la salida de cada hilo solo depende de los datos de entrada y se escriben en una posición exclusiva para cada hilo (es decir cada nilo escribe en una posicion de memoria asignada), por lo que no se requirió sincronizar los hilos. 
 
