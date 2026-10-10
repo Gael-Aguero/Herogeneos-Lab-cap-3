@@ -565,11 +565,24 @@ Acelerar el kernel de render un 26 % con `--use_fast_math` solo mejoró el tiemp
 En esta sección se adjuntarán los videos generados tanto por la versión de CPU como la merjo versión de GPU que se considera la versión final, en este caso se utilizará el video de la versión de reducción de comunicación entre el host y el device.
 ### Versión de CPU (Original)
 
-https://github.com/user-attachments/assets/6fadebf2-c349-44ec-9982-0a3d20716429
+
+
+
+
+
+https://github.com/user-attachments/assets/6860a62c-9a13-42ce-916b-6725b093ee07
+
+
+
+
 
 ### Versión final de GPU (optimización de comunicación entre host y device)
 
-https://github.com/user-attachments/assets/034b4b78-a1d0-4ede-9db3-d3898628fb63
+
+
+https://github.com/user-attachments/assets/733c7c63-890b-485f-85f5-fa0ba815cce3
+
+
 
 ## 12. Nota sobre utilización de herramientas de IA
 
