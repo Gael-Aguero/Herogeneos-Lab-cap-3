@@ -1,0 +1,26 @@
+Referencia: ../gpu_baseline/validation/gpu_baseline
+Prueba:     validation/gpu_host_device
+Tolerancias: alturas max|err|/max|ref| <= 0.0001, cuadros diff <= 2 niveles de gris
+
+MALLA DE ALTURAS (float32)
+frame   MAE          RMSE         max|err|     max|ref|     (x,y)      err_rel_max  estado
+0       0.000e+00    0.000e+00    0.000e+00    2.339e+00    (0,0)      0.000e+00    PASS
+1       0.000e+00    0.000e+00    0.000e+00    3.668e+00    (0,0)      0.000e+00    PASS
+10      0.000e+00    0.000e+00    0.000e+00    1.488e+01    (0,0)      0.000e+00    PASS
+100     0.000e+00    0.000e+00    0.000e+00    2.104e+01    (0,0)      0.000e+00    PASS
+300     0.000e+00    0.000e+00    0.000e+00    6.387e+00    (0,0)      0.000e+00    PASS
+600     0.000e+00    0.000e+00    0.000e+00    1.973e+00    (0,0)      0.000e+00    PASS
+899     0.000e+00    0.000e+00    0.000e+00    1.198e+00    (0,0)      0.000e+00    PASS
+
+CUADROS (escala de grises, 0-255)
+frame   MAE        max diff  % != 0     % > 1      PSNR(dB)   estado
+0       0.0000     0         0.0000     0.0000     inf        PASS
+1       0.0000     0         0.0000     0.0000     inf        PASS
+10      0.0000     0         0.0000     0.0000     inf        PASS
+100     0.0000     0         0.0000     0.0000     inf        PASS
+300     0.0000     0         0.0000     0.0000     inf        PASS
+600     0.0000     0         0.0000     0.0000     inf        PASS
+899     0.0000     0         0.0000     0.0000     inf        PASS
+
+Resultado global: PASS
+CSV escrito en results/validation_host_device_vs_baseline.csv

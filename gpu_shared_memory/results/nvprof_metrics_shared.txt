@@ -1,0 +1,12 @@
+==14743== NVPROF is profiling process 14743, command: ./build/drop_simulation --seconds 3
+==14743== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
+==14743== Profiling application: ./build/drop_simulation --seconds 3
+==14743== Profiling result:
+==14743== Metric result:
+Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "NVIDIA Tegra X1 (0)"
+    Kernel: stepKernelShared(float const *, float const *, float*, int, int, float, float, float)
+         90                          gld_transactions                  Global Load Transactions      633602      633602      633602
+         90                            gld_efficiency             Global Memory Load Efficiency      72.32%      72.32%      72.32%
+         90                  shared_load_transactions                  Shared Load Transactions      127600      127600      127600
+         90                        achieved_occupancy                        Achieved Occupancy    0.908867    0.938968    0.915796
