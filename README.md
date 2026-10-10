@@ -560,7 +560,18 @@ La optimización más eficaz fue la disminución de la comunicación host-device
 
 Acelerar el kernel de render un 26 % con `--use_fast_math` solo mejoró el tiempo total en un 2 %, ya que dicho kernel era el 15.2 % del tiempo, tal como la Ley de Amdahl prevé. Las optimizaciones no tuvieron un impacto considerable en la precisión de los números.
 
-## 11. Nota sobre utilización de herramientas de IA
+## 11. Comparacion de videos generados
+
+En esta sección se adjuntarán los videos generados tanto por la versión de CPU como la merjo versión de GPU que se considera la versión final, en este caso se utilizará el video de la versión de reducción de comunicación entre el host y el device.
+### Versión de CPU (Original)
+
+https://github.com/user-attachments/assets/6fadebf2-c349-44ec-9982-0a3d20716429
+
+### Versión final de GPU (optimización de comunicación entre host y device)
+
+https://github.com/user-attachments/assets/034b4b78-a1d0-4ede-9db3-d3898628fb63
+
+## 12. Nota sobre utilización de herramientas de IA
 
 Se hace uso de herramientas de IA como apoyo para comprender conceptos, generar ideas y mejorar la redacción de la documentación. La implementación, la validación y los resultados son responsabilidad del estudiante, quien asume la responsabilidad por el uso indebido o no descrito anteriormente.
 
