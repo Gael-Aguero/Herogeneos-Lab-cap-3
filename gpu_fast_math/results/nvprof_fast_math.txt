@@ -1,0 +1,20 @@
+Tiempo: 46.7898 s
+Pasos simulados: 900
+Rendimiento: 19.235 pasos/s
+==21583== Profiling application: ./build/drop_simulation
+==21583== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   34.32%  5.33595s       900  5.9288ms  5.9111ms  5.9475ms  frameKernel(float const , uchar3, int, int, float3)
+                   29.49%  4.58480s      2700  1.6981ms  1.5253ms  3.9258ms  [CUDA memcpy HtoD]
+                   20.65%  3.21099s       900  3.5678ms  3.5587ms  3.5902ms  stepKernel(float const , float const *, float, int, int, float, float, float)
+                   15.53%  2.41457s      1800  1.3414ms  1.1530ms  1.5370ms  [CUDA memcpy DtoH]
+      API calls:   72.36%  20.0186s      4500  4.4486ms  851.74us  29.048ms  cudaMemcpy
+                   21.80%  6.03066s      4500  1.3401ms  894.40us  466.59ms  cudaMalloc
+                    4.96%  1.37098s      4500  304.66us  154.27us  3.4380ms  cudaFree
+                    0.88%  243.43ms      1800  135.24us  95.783us  2.3382ms  cudaLaunchKernel
+                    0.00%  175.53us        97  1.8090us     989ns  36.251us  cuDeviceGetAttribute
+                    0.00%  13.958us         1  13.958us  13.958us  13.958us  cuDeviceTotalMem
+                    0.00%  7.9170us         3  2.6390us  1.7710us  3.5420us  cuDeviceGetCount
+                    0.00%  5.4170us         2  2.7080us  1.9790us  3.4380us  cuDeviceGet
+                    0.00%  2.3960us         1  2.3960us  2.3960us  2.3960us  cuDeviceGetName
+                    0.00%  1.4580us         1  1.4580us  1.4580us  1.4580us  cuDeviceGetUuid

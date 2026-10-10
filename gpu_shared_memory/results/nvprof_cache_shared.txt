@@ -1,0 +1,12 @@
+==15495== NVPROF is profiling process 15495, command: ./build/drop_simulation --seconds 3
+==15495== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
+==15495== Profiling application: ./build/drop_simulation --seconds 3
+==15495== Profiling result:
+==15495== Metric result:
+Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "NVIDIA Tegra X1 (0)"
+    Kernel: stepKernelShared(float const *, float const *, float*, int, int, float, float, float)
+         90                           global_hit_rate         Global Hit Rate in unified l1/tex       0.00%       0.00%       0.00%
+         90                      l2_read_transactions                      L2 Read Transactions      159337      159936      159447
+         90                             inst_executed                     Instructions Executed     1241600     1241600     1241600
+         90                                stall_sync     Issue Stall Reasons (Synchronization)       8.63%      18.83%      14.87%
