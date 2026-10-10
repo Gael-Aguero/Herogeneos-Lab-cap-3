@@ -530,7 +530,35 @@ Los archivos completos se encuentran dentro de la carpeta `results/` en cada una
 
 ## 9. Análisis de rendimiento 
 
+La versión CPU, que utiliza un único núcleo, tiene un IPC de 1.07 y solo 0.86 % de fallos en la caché; por eso está restringida por el cálculo secuencial. El render y la simulación concentran cerca del 90 % del tiempo, lo que permite un speedup teórico máximo cercano a 10x.
+
+La GPU base solamente llega a 2.31x. De acuerdo con `nvprof`, los kernels representan el 21.9 % de los 47.52 segundos totales (10.42 s), mientras que la CPU tarda 29.73 segundos en aguardar por las llamadas a `cudaMemcpy`, `cudaMalloc` y `cudaFree`. El porteo directo transformó la comunicación en el principal obstáculo.
+
+### 9.1 Efecto de cada optimización
+
+| Optimización | Qué ataca | Peso en la GPU base | Efecto en el tiempo total |
+|---|---|---:|---:|
+| Memoria compartida | Tráfico de memoria de `stepKernel` | 6.8 % | −2.5 % |
+| `--use_fast_math` | Costo aritmético de `frameKernel` | 15.2 % | +2 % |
+| Reducción host-device | Comunicación y gestión de memoria | 62.6 % | +33.9 % |
+
+- **Memoria compartida:** Disminuyó las lecturas en L2 en un 55%. Sin embargo, el kernel fue 33.7% más lento debido a que ejecuta un 34.7% más de instrucciones y el 14.9% de las esperas se debieron a `__syncthreads()`. El kernel no estaba restringido por la memoria, sino por las instrucciones.
+- **`--use_fast_math`:** se aceleró el render en un 26 % al emplear la versión intrínseca de `powf`, sin que el error con respecto a la CPU se modificara. Sin embargo, el render representa únicamente el 15.2% del total; por lo tanto, la optimización global fue mínima (Ley de Amdahl).
+- **Reducción host-device:** Suprimió casi todas las copias y reservas de memoria sin modificar los kernels, alcanzando el mayor aumento de velocidad (1.51x sobre la GPU base, 3.50x sobre la CPU). La disminución del tiempo total (16.11s) es congruente con el ahorro en la API (16.22s).
+
+La optimización que tuvo un impacto más significativo fue la que se centró en el componente de mayor peso, según lo señalaba el perfil de la GPU base. Asimismo, el resultado en la Jetson Nano verifica que, a pesar de que la CPU y la GPU compartan la memoria física, las transferencias explícitas continúan siendo caras.
+
+Después de disminuir la comunicación, alrededor de 17.7 segundos del tiempo total se dedican al trabajo en la CPU, que consiste principalmente en codificar el video; mientras que aproximadamente 13 segundos son para esperar a la GPU. La GPU base fue utilizada para aplicar y medir cada optimización de forma independiente, así que no se evaluó su combinación. Dado que la reducción host-device influye en la comunicación y `--use_fast_math` afecta a los kernels, ambas son independientes y es posible usarlas simultáneamente. Según las estimaciones basadas en las mediciones, la combinación disminuiría el tiempo total a aproximadamente 29.5 s (un speedup de cerca de 3.7x en comparación con la CPU), aunque esta cifra no fue medida. 
+
 ## 10. Conclusiones 
+
+Todas las decisiones del laboratorio fueron orientadas por el perfilado. En la CPU detectó que aproximadamente el 90 % del tiempo se dedicaba a la simulación y al render, mientras que en la GPU base reveló que no eran los kernels el cuello de botella, sino la comunicación entre el dispositivo y el host; esto justifica por qué el porteo directo solo llegó a un speedup de 2.31x.
+
+La memoria compartida disminuyó el tráfico a la caché L2 en un 55 %, aunque hizo más lento el kernel un 33.7 % debido a que se le incorporaron instrucciones y sincronización a un kernel que no tenía limitación de memoria. Esto indica que una optimización adecuada, en teoría, puede deteriorar el desempeño si no elimina el verdadero problema.
+
+La optimización más eficaz fue la disminución de la comunicación host-device, ya que sin modificar los kernels, se consiguió un speedup de 3.50x en comparación con la CPU y de 1.51x en comparación con la GPU base, lo que confirma que el rendimiento de la GPU está condicionado por el flujo total de datos, aun en una arquitectura integrada como Jetson Nano.
+
+Acelerar el kernel de render un 26 % con `--use_fast_math` solo mejoró el tiempo total en un 2 %, ya que dicho kernel era el 15.2 % del tiempo, tal como la Ley de Amdahl prevé. Las optimizaciones no tuvieron un impacto considerable en la precisión de los números.
 
 ## 11. Nota sobre utilización de herramientas de IA
 
