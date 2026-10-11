@@ -176,7 +176,70 @@ En comparación con la CPU, la GPU base consigue un speedup de 2.31x, lo cual es
 
 ### 6.1 Estrategia de validación
 
+El objetivo de la validación es comprobar que la versión GPU produce resultados equivalentes a los de la CPU, y repetir la comprobación cada vez que cambia el cálculo o la representación numérica. El video `.mp4` no sirve para esto, porque la compresión con pérdidas mezclaría el error del codificador con el de la GPU. Por eso cada versión (CPU y GPU) guarda resultados binarios de algunos cuadros, con exactamente el mismo formato, y una herramienta aparte (`compare_dumps`) compara dos carpetas de resultados. Como la inicialización de la gota es determinista, con los mismos parámetros y los mismos 900 pasos las salidas son directamente comparables.
+
+**Qué se guarda.** Cada ejecutable acepta la opción `--dump-dir <carpeta>` y, solo cuando se usa, escribe dos archivos por cuadro en siete cuadros fijos (0, 1, 10, 100, 300, 600 y 899), que cubren desde el inicio hasta el final de la simulación:
+
+| Archivo | Contenido | Para qué sirve |
+|---|---|---|
+| `height_fNNNNNN.bin` | Malla de alturas completa, `float32` (640×640) | Error numérico real de la simulación |
+| `frame_fNNNNNN.bin` | Cuadro en escala de grises, `uint8` | Error visual del renderizado |
+
+`NNNNNN` es el índice de cuadro del ciclo principal. En las versiones GPU, la malla se copia al host solo en estos cuadros y solo cuando `--dump-dir` está activo, por lo que el volcado no afecta la ejecución normal.
+
+**Métricas.**
+
+- *Alturas:* error absoluto medio (MAE), RMSE, error absoluto máximo con su posición (x,y), pico de la referencia `max|ref|` y error relativo al pico, `max|err| / max|ref|`.
+- *Cuadros:* MAE, diferencia máxima, porcentaje de píxeles distintos, porcentaje con diferencia mayor que 1 nivel de gris y PSNR en dB.
+
+**Criterios de aceptación.**
+
+- **Alturas:** `max|err| / max|ref| ≤ 1e-4`. El error se normaliza con el pico de la referencia porque la amplitud de la onda cambia mucho a lo largo de la simulación (decae de ~21 a ~1), así que un umbral absoluto sería injusto con los cuadros finales. El valor de 1e-4 es unos tres órdenes de magnitud mayor que el épsilon de `float32` (≈1.2e-7), lo que deja margen para el redondeo acumulado en 900 pasos, pero detecta errores reales como bordes mal tratados o pasos desfasados.
+- **Cuadros:** diferencia máxima de 2 niveles de gris por píxel, sobre una escala de 0 a 255.
+- **Valores no finitos:** cualquier `NaN` o `Inf` en la versión de prueba es fallo automático.
+
+**Diferencias esperadas.** No se espera igualdad exacta entre CPU y GPU. `nvcc` fusiona multiplicaciones y sumas (FMA) por defecto, `powf` y `rsqrtf` de CUDA no son idénticas a `std::pow` y `cv::normalize`, y el orden de las operaciones puede variar. Estas diferencias son del orden del redondeo de `float32`.
+
+**Validación de cada optimización.** Cada versión se compara contra la CPU y también contra la GPU base. Esto permite distinguir una optimización que no modifica el cálculo (error 0 respecto a la base, como la memoria compartida y la reducción host-device) de una que sí lo modifica (`--use_fast_math`, sección 7.3). El detalle completo de la herramienta y de los comandos está en el README del Ejercicio E.
+
 ### 6.2 Resultados de la GPU base
+
+Comparación de la carpeta de la CPU contra la de la GPU base en los siete cuadros de validación. Resultado global: **PASS** en todos.
+
+**Malla de alturas (float32) respecto a la CPU**
+
+| Cuadro | MAE | RMSE | max\|err\| | max\|ref\| | Error relativo al pico | Posición (x,y) |
+|---|---|---|---|---|---|---|
+| 0 | 2.1e-12 | 4.2e-10 | 1.19e-7 | 2.339 | 5.1e-8 | (305,327) |
+| 1 | 4.4e-12 | 7.3e-10 | 2.38e-7 | 3.668 | 6.5e-8 | (305,327) |
+| 10 | 4.1e-10 | 1.8e-8 | 2.86e-6 | 14.88 | 1.9e-7 | (307,300) |
+| 100 | 2.4e-7 | 1.8e-6 | 5.91e-5 | 21.04 | 2.8e-6 | (314,311) |
+| 300 | 9.5e-7 | 2.8e-6 | 3.05e-5 | 6.387 | 4.8e-6 | (319,380) |
+| 600 | 2.2e-6 | 3.6e-6 | 1.82e-5 | 1.973 | 9.2e-6 | (265,277) |
+| 899 | 4.5e-6 | 5.7e-6 | 1.88e-5 | 1.198 | 1.6e-5 | (314,312) |
+
+**Cuadros (escala de grises) respecto a la CPU**
+
+| Cuadro | MAE | Dif. máx. | Píxeles distintos | Píxeles con dif. > 1 | PSNR (dB) |
+|---|---|---|---|---|---|
+| 0 | 0 | 0 | 0 % | 0 % | inf |
+| 1 | 0 | 0 | 0 % | 0 % | inf |
+| 10 | 0 | 0 | 0 % | 0 % | inf |
+| 100 | 3.9e-5 | 1 | 0.0039 % (16 px) | 0 % | 92.2 |
+| 300 | 1.7e-4 | 1 | 0.0166 % (68 px) | 0 % | 85.9 |
+| 600 | 2.6e-4 | 1 | 0.0256 % (105 px) | 0 % | 84.0 |
+| 899 | 3.7e-4 | 1 | 0.0371 % (152 px) | 0 % | 82.4 |
+
+Los conteos de píxeles son sobre 409 600 (640 × 640).
+
+**Análisis**
+
+- **La GPU base es equivalente a la CPU dentro de la tolerancia.** El peor error relativo de las alturas es 1.6e-5 (cuadro 899), unas 6 veces por debajo del umbral de 1e-4. El mayor error absoluto es 5.91e-5, en el cuadro 100, cuando la onda tiene su máxima amplitud (~21).
+- **No hay `NaN` ni `Inf`, y el error no crece de forma explosiva.** El MAE sube de forma gradual, de ~1e-12 en el cuadro 0 a ~4.5e-6 en el 899. Es el comportamiento esperado de un esquema numéricamente estable (con `c² = 0.2025` se cumple la condición de estabilidad) en el que el redondeo de `float32` se acumula a lo largo de 900 pasos.
+- **El error relativo crece con el tiempo** (de 5e-8 a 1.6e-5) aunque el error absoluto máximo no lo haga, porque la amplitud de la onda decae por el amortiguamiento y el error se normaliza con ese pico cada vez menor.
+- **Visualmente, las versiones son prácticamente indistinguibles.** La diferencia máxima es de 1 nivel de gris en todos los cuadros, ningún píxel difiere en más de 1 y, como mucho, 152 píxeles de 409 600 (0.037 %) son distintos. El PSNR está entre 82 y 92 dB.
+- **Los cuadros 0, 1 y 10 son idénticos.** Ahí los errores de las alturas (≤3e-6) no alcanzan a cambiar el valor entero de ningún píxel. La diferencia de 1 nivel de gris aparece justo cuando el error de las alturas crece (cuadro 100 en adelante), por lo que los errores numéricos y visuales son coherentes.
+- **Esta versión es el punto de comparación para las optimizaciones.** La memoria compartida y la reducción host-device dieron error 0 respecto a la GPU base, es decir, resultados idénticos bit a bit, mientras que `--use_fast_math` produjo diferencias del mismo orden que las de la base (sección 7.3).
 
 
 ## 7. Optimizaciones
