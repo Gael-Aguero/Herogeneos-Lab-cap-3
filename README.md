@@ -1,5 +1,36 @@
 # Laboratorio Capítulo 3 
 
+## Índice
+
+1. [Descripción del programa base](#1-descripción-del-programa-base)
+2. [Diagrama de flujo](#2-diagrama-de-flujo)
+3. [Explicación de cada función](#3-explicación-de-cada-función)
+4. [Perfilado de la versión CPU](#4-perfilado-de-la-versión-cpu)
+   - 4.1 [Perfilado con perf](#41-perfilado-con-perf)
+   - 4.2 [Perfilado con Google Performance Tools](#42-perfilado-con-google-performance-tools)
+   - 4.3 [Comparación entre herramientas](#43-comparación-entre-herramientas)
+   - 4.4 [Función a portar primero a GPU](#44-función-a-portar-primero-a-gpu)
+   - 4.5 [Funciones que no conviene portar](#45-funciones-que-no-conviene-portar)
+5. [Porteo a GPU](#5-porteo-a-gpu)
+   - 5.1 [Justificación de las funciones portadas](#51-justificación-de-las-funciones-portadas)
+   - 5.2 [Diseño de los kernels CUDA](#52-diseño-de-los-kernels-cuda)
+   - 5.3 [Resultados de la GPU base](#53-resultados-de-la-gpu-base)
+6. [Estrategia de validación CPU vs GPU](#6-estrategia-de-validación-cpu-vs-gpu)
+   - 6.1 [Estrategia de validación](#61-estrategia-de-validación)
+   - 6.2 [Resultados de la GPU base](#62-resultados-de-la-gpu-base)
+7. [Optimizaciones](#7-optimizaciones)
+   - 7.1 [Optimización 1: Memoria compartida con tiling y halo](#71-optimización-1-memoria-compartida-con-tiling-y-halo)
+   - 7.2 [Optimización 2: reducción de comunicación host-device](#72-optimización-2-reducción-de-comunicación-host-device)
+   - 7.3 [Optimización 3: uso de `--use_fast_math`](#73-optimización-3-uso-de---use_fast_math)
+8. [Resumen de resultados](#8-resumen-de-resultados)
+   - 8.1 [Tabla comparativa](#81-tabla-comparativa)
+   - 8.2 [Salidas relevantes de nvprof](#82-salidas-relevantes-de-nvprof)
+9. [Análisis de rendimiento](#9-análisis-de-rendimiento)
+   - 9.1 [Efecto de cada optimización](#91-efecto-de-cada-optimización)
+10. [Conclusiones](#10-conclusiones)
+11. [Comparación de videos generados](#11-comparacion-de-videos-generados)
+12. [Nota sobre utilización de herramientas de IA](#12-nota-sobre-utilización-de-herramientas-de-ia)
+
 
 ## 1. Descripción del programa base
 
@@ -657,3 +688,4 @@ Se adjuntan los enlaces compartidos de las conversaciones como evidencia:
 - https://chatgpt.com/share/6ac84f6e-a9f0-83e8-a1cf-d3643a9d31d0
 - https://claude.ai/share/14cfa2b4-d676-4e81-9205-a64657fc473a
 - https://claude.ai/share/cce87314-7627-4a11-bbb3-139cb786a89e
+- https://claude.ai/share/77f368f0-378d-434a-9106-6cd6950d1c7e
