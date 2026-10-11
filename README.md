@@ -655,3 +655,5 @@ Se adjuntan los enlaces compartidos de las conversaciones como evidencia:
 
 - https://share.gemini.google/MZ4nmLKV4dKc
 - https://chatgpt.com/share/6ac84f6e-a9f0-83e8-a1cf-d3643a9d31d0
+- https://claude.ai/share/14cfa2b4-d676-4e81-9205-a64657fc473a
+- https://claude.ai/share/cce87314-7627-4a11-bbb3-139cb786a89e
